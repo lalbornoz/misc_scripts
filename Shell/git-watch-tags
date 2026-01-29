@@ -1,0 +1,40 @@
+#!/bin/sh
+
+GIT_WATCH_TAGS="";
+
+main() {
+	local _git_repo="" _git_log_fname="" _rc=0;
+
+	if [ -r "${0}.conf" ]; then
+		. "${0}.conf";
+	fi;
+
+	_git_log_fname="$(mktemp)" || exit 1;
+	trap "rm -f \"${_git_log_fname}\"" EXIT HUP INT TERM USR1 USR2;
+
+	if [ "${#}" -eq 0 ]; then
+		set -- ${GIT_WATCH_TAGS};
+	fi;
+
+	for _git_repo in "${@}"; do
+		if cd "${_git_repo}"; then
+			git pull >"${_git_log_fname}" 2>&1; _rc="${?}";
+			if [ "${_rc}" -eq 0 ]; then
+				_git_tags_new="$(sed -n				\
+					'/\[new tag\]/s/^.*-> \(.\+\)$/\1/p'	\
+					"${_git_log_fname}")";
+			else
+				_git_tags_new="";
+			fi;
+			cd "${OLDPWD}";
+
+			if [ "${_git_tags_new:+1}" = 1 ]; then
+				printf "Git repository at %s has new tags:\n" "${_git_repo}";
+				printf "%s\n" "${_git_tags_new}";
+				printf "\n";
+			fi;
+		fi;
+	done;
+};
+
+set +o errexit -o noglob -o nounset +o xtrace; main "${@}";

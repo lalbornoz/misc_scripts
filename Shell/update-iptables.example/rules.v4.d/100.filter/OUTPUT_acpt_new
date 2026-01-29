@@ -1,0 +1,4 @@
+-p icmp -m icmp --icmp-type 8 -m owner --uid-owner 0 -m conntrack --ctstate NEW -j ACCEPT
+-p tcp -m tcp -m conntrack --ctstate NEW -j ACCEPT
+
+# vim:filetype=conf

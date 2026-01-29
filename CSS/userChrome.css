@@ -1,0 +1,15 @@
+/*
+ * Workaround for:
+ * https://bugzilla.mozilla.org/show_bug.cgi?id=1852437
+ * https://bugzilla.mozilla.org/show_bug.cgi?id=1869167
+ * https://bugzilla.mozilla.org/show_bug.cgi?id=1892594
+ * https://bugzilla.mozilla.org/show_bug.cgi?id=1941200
+ * https://bugzilla.mozilla.org/show_bug.cgi?id=2008463
+ * (taken from https://support.mozilla.org/en-US/questions/1543703)
+ */
+
+#calendar-event-window,
+#calendar-task-window {
+  min-width: 63em !important;
+  min-height: 81em !important;
+}

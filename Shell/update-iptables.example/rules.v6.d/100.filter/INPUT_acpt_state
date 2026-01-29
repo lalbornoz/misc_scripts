@@ -1,0 +1,5 @@
+-p ipv6-icmp -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-p tcp -m tcp -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-p udp -m udp -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+
+# vim:filetype=conf

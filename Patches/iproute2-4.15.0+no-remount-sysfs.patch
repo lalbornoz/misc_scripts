@@ -1,0 +1,28 @@
+--- iproute2-4.15.0/debian/patches/series.orig	2020-08-04 12:56:01.100140651 +0200
++++ iproute2-4.15.0/debian/patches/series	2020-08-04 12:56:20.351218186 +0200
+@@ -5,3 +5,4 @@
+ netns-allow-negative-nsid
+ CVE-2019-20795.patch
+ lp1873961-tc-fix-bugs-for-tcp_flags-and-ip_attr-hex-output.patch
++9999-no-remount-sysfs.patch
+--- iproute2-4.15.0/debian/patches/9999-no-remount-sysfs.patch.orig	1970-01-01 01:00:00.000000000 +0100
++++ iproute2-4.15.0/debian/patches/9999-no-remount-sysfs.patch	2020-08-04 12:56:01.100140651 +0200
+@@ -0,0 +1,18 @@
++--- iproute2-4.15.0/lib/namespace.c.orig	2018-01-29 17:08:52.000000000 +0100
+++++ iproute2-4.15.0/lib/namespace.c	2020-03-16 11:51:59.263397282 +0100
++@@ -73,15 +73,6 @@
++ 			strerror(errno));
++ 		return -1;
++ 	}
++-	/* Mount a version of /sys that describes the network namespace */
++-	if (umount2("/sys", MNT_DETACH) < 0) {
++-		fprintf(stderr, "umount of /sys failed: %s\n", strerror(errno));
++-		return -1;
++-	}
++-	if (mount(name, "/sys", "sysfs", 0, NULL) < 0) {
++-		fprintf(stderr, "mount of /sys failed: %s\n",strerror(errno));
++-		return -1;
++-	}
++ 
++ 	/* Setup bind mounts for config files in /etc */
++ 	bind_etc(name);

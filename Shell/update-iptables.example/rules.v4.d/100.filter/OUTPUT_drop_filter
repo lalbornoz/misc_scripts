@@ -1,0 +1,10 @@
+-o lo -j ACCEPT
+
+-j OUTPUT_drop_rsvd_local
+
+-s 1.2.3.4/32 -o eth0 -j RETURN		# FIXME TODO XXX CHANGE ME FIXME TODO XXX
+
+-j NFLOG --nflog-prefix "iptables/OUTPUT_drop_filter "
+-j DROP
+
+# vim:filetype=conf

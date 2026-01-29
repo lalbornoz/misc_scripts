@@ -1,0 +1,66 @@
+--- tmux-3.2-rc/compat.h.orig	2020-06-18 22:01:11.000000000 +0200
++++ tmux-3.2-rc/compat.h	2020-06-24 13:45:27.194765300 +0200
+@@ -378,9 +378,15 @@
+ 
+ #ifdef HAVE_UTF8PROC
+ /* utf8proc.c */
++#ifndef __CYGWIN__
+ int		 utf8proc_wcwidth(wchar_t);
+ int		 utf8proc_mbtowc(wchar_t *, const char *, size_t);
+ int		 utf8proc_wctomb(char *, wchar_t);
++#else
++int		 utf8proc_wcwidth(uint32_t);
++int		 utf8proc_mbtowc(uint32_t *, const char *, size_t);
++int		 utf8proc_wctomb(char *, uint32_t);
++#endif
+ #endif
+ 
+ /* getopt.c */
+--- tmux-3.2-rc/compat/utf8proc.c.orig	2020-05-14 14:24:40.000000000 +0200
++++ tmux-3.2-rc/compat/utf8proc.c	2020-06-24 13:46:48.742738200 +0200
+@@ -21,7 +21,11 @@
+ #include "compat.h"
+ 
+ int
++#ifndef __CYGWIN__
+ utf8proc_wcwidth(wchar_t wc)
++#else
++utf8proc_wcwidth(uint32_t wc)
++#endif
+ {
+ 	int	cat;
+ 
+@@ -37,7 +41,11 @@
+ }
+ 
+ int
++#ifndef __CYGWIN__
+ utf8proc_mbtowc(wchar_t *pwc, const char *s, size_t n)
++#else
++utf8proc_mbtowc(uint32_t *pwc, const char *s, size_t n)
++#endif
+ {
+ 	utf8proc_ssize_t	slen;
+ 
+@@ -49,13 +57,21 @@
+ 	 * slen < 0 indicates an error
+ 	 */
+ 	slen = utf8proc_iterate(s, n, pwc);
++#ifndef __CYGWIN__
+ 	if (*pwc == (wchar_t)-1 || slen < 0)
++#else
++	if (*pwc == (uint32_t)-1 || slen < 0)
++#endif
+ 		return (-1);
+ 	return (slen);
+ }
+ 
+ int
++#ifndef __CYGWIN__
+ utf8proc_wctomb(char *s, wchar_t wc)
++#else
++utf8proc_wctomb(char *s, uint32_t wc)
++#endif
+ {
+ 	if (s == NULL)
+ 		return (0);

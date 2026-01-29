@@ -1,0 +1,4 @@
+! -i eth0 -p icmp -m icmp --icmp-type 8 -m conntrack --ctstate NEW -m comment --comment "~eth0! (ICMP echo-reqeust)" -j ACCEPT
+-i eth0 -p tcp -m tcp --dport 22 -m conntrack --ctstate NEW -m comment --comment "eth0! (SSH)" -j ACCEPT
+
+# vim:filetype=conf

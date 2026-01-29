@@ -1,0 +1,12 @@
+[Unit]
+Description=Autostart tmux(1) sessions
+After=network.target sshd.service
+
+[Service]
+EnvironmentFile=-/etc/default/tmux_autostart
+ExecStart=/lib/systemd/system/tmux_autostart.sh
+RemainAfterExit=yes
+Type=oneshot
+
+[Install]
+WantedBy=multi-user.target

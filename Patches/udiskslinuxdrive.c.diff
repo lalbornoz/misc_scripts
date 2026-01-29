@@ -1,0 +1,59 @@
+--- a/src/udiskslinuxdrive.c	2021-09-29 18:00:31.000000000 +0200
++++ b/src/udiskslinuxdrive.c	2023-03-17 08:42:24.422034434 +0100
+@@ -1346,7 +1346,7 @@
+   UDisksLinuxDevice *device = NULL;
+   gchar *remove_path = NULL;
+   FILE *f;
+-  GUdevDevice *usb_device = NULL;
++  GUdevDevice *udev_device = NULL;
+   UDisksLinuxDriveObject *object;
+   UDisksLinuxBlockObject *block_object = NULL;
+   GList *blocks_to_sync = NULL;
+@@ -1550,18 +1550,29 @@
+                                              "No device");
+       goto out;
+     }
+-  usb_device = g_udev_device_get_parent_with_subsystem (device->udev_device, "usb", "usb_device");
+-  if (usb_device == NULL)
++  udev_device = g_udev_device_get_parent_with_subsystem (device->udev_device, "usb", "usb_device");
++  if (udev_device == NULL)
+     {
+-      g_dbus_method_invocation_return_error (invocation,
+-                                             UDISKS_ERROR,
+-                                             UDISKS_ERROR_FAILED,
+-                                             "No usb device");
+-      goto out;
++      udev_device = g_udev_device_get_parent_with_subsystem (device->udev_device, "scsi", "scsi_device");
++      if (udev_device == NULL)
++        {
++          g_dbus_method_invocation_return_error (invocation,
++                                                 UDISKS_ERROR,
++                                                 UDISKS_ERROR_FAILED,
++                                                 "No usb or scsi device");
++          goto out;
++        }
++      else
++        {
++          remove_path = g_strdup_printf ("%s/delete", g_udev_device_get_sysfs_path (udev_device));
++        }
++    }
++  else
++    {
++      /* http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=commit;h=253e05724f9230910344357b1142ad8642ff9f5a */
++      remove_path = g_strdup_printf ("%s/remove", g_udev_device_get_sysfs_path (udev_device));
+     }
+ 
+-  /* http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=commit;h=253e05724f9230910344357b1142ad8642ff9f5a */
+-  remove_path = g_strdup_printf ("%s/remove", g_udev_device_get_sysfs_path (usb_device));
+   f = fopen (remove_path, "w");
+   if (f == NULL)
+     {
+@@ -1604,7 +1615,7 @@
+   g_list_free_full (blocks_to_sync, g_object_unref);
+   g_list_free_full (sibling_objects, g_object_unref);
+   g_free (remove_path);
+-  g_clear_object (&usb_device);
++  g_clear_object (&udev_device);
+   g_clear_object (&device);
+   g_clear_object (&block_object);
+   g_free (error_message);

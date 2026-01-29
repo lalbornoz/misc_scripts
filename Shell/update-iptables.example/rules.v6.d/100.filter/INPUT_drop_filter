@@ -1,0 +1,10 @@
+-i lo -j ACCEPT
+
+-d 1:2::3:4/64 -i eth0 -j RETURN	# FIXME TODO XXX CHANGE ME FIXME TODO XXX
+-d fe80::/10 -i eth0 -j RETURN
+-d ff00::/8 -i eth0 -j RETURN
+
+-j NFLOG --nflog-prefix  "ip6tables/INPUT_drop_filter "
+-j DROP
+
+# vim:filetype=conf

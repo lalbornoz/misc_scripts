@@ -1,0 +1,28 @@
+:FORWARD DROP [0:0]
+:INPUT DROP [0:0]
+:OUTPUT DROP [0:0]
+:INPUT_acpt_state - [0:0]
+:INPUT_acpt_svc_ndp - [0:0]
+:INPUT_drop_filter - [0:0]
+:OUTPUT_acpt_new - [0:0]
+:OUTPUT_acpt_state - [0:0]
+:OUTPUT_acpt_svc_ndp - [0:0]
+:OUTPUT_drop_filter - [0:0]
+:OUTPUT_drop_new - [0:0]
+-A FORWARD -j NFLOG --nflog-prefix "ip6tables/FORWARD "
+-A INPUT -i lo -j ACCEPT
+-A INPUT -m conntrack --ctstate INVALID -j DROP
+-A INPUT -j INPUT_drop_filter
+-A INPUT -j INPUT_acpt_state
+-A INPUT -j INPUT_acpt_svc_ndp
+-A INPUT -j NFLOG --nflog-prefix "ip6tables/INPUT "
+-A OUTPUT -o lo -j ACCEPT
+-A OUTPUT -m conntrack --ctstate INVALID -j DROP
+-A OUTPUT -j OUTPUT_drop_filter
+-A OUTPUT -j OUTPUT_acpt_state
+-A OUTPUT -j OUTPUT_acpt_svc_ndp
+-A OUTPUT -j OUTPUT_drop_new
+-A OUTPUT -j OUTPUT_acpt_new
+-A OUTPUT -j NFLOG --nflog-prefix "ip6tables/OUTPUT "
+
+# vim:filetype=conf

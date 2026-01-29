@@ -1,0 +1,4 @@
+-p icmp -m icmp --icmp-type port-unreachable -j DROP
+-p tcp -m tcp --tcp-flags ALL RST,ACK -j DROP
+
+# vim:filetype=conf

@@ -1,0 +1,21 @@
+--- plugins/Notifications-0.3.egg/deluge_notifications/core.py.dist	2019-06-12 23:17:44.000000000 +0200
++++ plugins/Notifications-0.3.egg/deluge_notifications/core.py	2020-04-11 15:21:07.293375897 +0200
+@@ -16,6 +16,7 @@
+ 
+ import logging
+ import smtplib
++import sys
+ from email.utils import formatdate
+ 
+ from twisted.internet import defer, threads
+@@ -154,8 +155,9 @@
+             try:
+                 server.sendmail(self.config['smtp_from'], to_addrs, message)
+             except smtplib.SMTPException as ex:
++                exc_info = sys.exc_info()
+                 err_msg = (
+-                    _('There was an error sending the notification email: %s') % ex
++                    _('There was an error sending the notification email: %s, %s') % (exc_info[0], exc_info[1],)
+                 )
+                 log.error(err_msg)
+                 return ex

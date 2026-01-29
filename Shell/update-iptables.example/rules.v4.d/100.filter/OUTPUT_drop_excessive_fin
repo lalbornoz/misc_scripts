@@ -1,0 +1,4 @@
+-p tcp -m tcp --tcp-flags FIN,SYN,RST,ACK RST -m limit --limit 8/min -j ACCEPT
+-p tcp -m tcp --tcp-flags FIN,SYN,RST,ACK RST -j DROP
+
+# vim:filetype=conf

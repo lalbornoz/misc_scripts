@@ -1,0 +1,4 @@
+-d 1.2.3.4/8 -i br0 -j RETURN	# FIXME TODO XXX CHANGE ME FIXME TODO XXX
+-j OUTPUT_drop_rsvd_pfx
+
+# vim:filetype=conf

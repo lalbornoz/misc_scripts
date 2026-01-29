@@ -1,0 +1,25 @@
+--- ui/web/json_api.py.dist	2019-06-12 23:17:45.000000000 +0200
++++ ui/web/json_api.py	2020-05-03 19:29:23.309721987 +0200
+@@ -724,7 +724,8 @@
+         Add torrents by file
+ 
+         :param torrents: A list of dictionaries containing the torrent \
+-            path and torrent options to add with.
++            path, torrent data and torrent options to add with. Torrent data \
++            is optional and must be encoded with base64.
+         :type torrents: list
+ 
+         ::
+@@ -748,8 +749,10 @@
+                 deferreds.append(d)
+             else:
+                 filename = os.path.basename(torrent['path'])
+-                with open(torrent['path'], 'rb') as _file:
+-                    fdump = b64encode(_file.read())
++                fdump = torrent.pop("data", None)
++                if fdump == None:
++                    with open(torrent['path'], 'rb') as _file:
++                        fdump = b64encode(_file.read())
+                 log.info(
+                     'Adding torrent from file `%s` with options `%r`',
+                     filename,

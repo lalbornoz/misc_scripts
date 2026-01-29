@@ -1,0 +1,203 @@
+--- plugins/Extractor-0.7.egg/deluge_extractor/core.py.dist	2019-06-12 23:17:44.000000000 +0200
++++ plugins/Extractor-0.7.egg/deluge_extractor/core.py	2020-04-11 14:50:55.998755066 +0200
+@@ -16,6 +16,8 @@
+ import errno
+ import logging
+ import os
++import shutil
++import traceback
+ 
+ from twisted.internet.utils import getProcessOutputAndValue
+ from twisted.python.procutils import which
+@@ -28,7 +30,7 @@
+ 
+ log = logging.getLogger(__name__)
+ 
+-DEFAULT_PREFS = {'extract_path': '', 'use_name_folder': True}
++DEFAULT_PREFS = {'extract_path': '', 'use_name_folder': True, 'auto_delete': False}
+ 
+ if windows_check():
+     win_7z_exes = [
+@@ -110,37 +112,60 @@
+         component.get('EventManager').register_event_handler(
+             'TorrentFinishedEvent', self._on_torrent_finished
+         )
++        component.get('EventManager').register_event_handler(
++            'PreTorrentRemovedEvent', self._on_pre_torrent_removed
++        )
+ 
+     def disable(self):
+         component.get('EventManager').deregister_event_handler(
+             'TorrentFinishedEvent', self._on_torrent_finished
+         )
++        component.get('EventManager').deregister_event_handler(
++            'PreTorrentRemovedEvent', self._on_pre_torrent_removed
++        )
+ 
+     def update(self):
+         pass
+ 
++    def _check_torrent_file(self, f):
++        checkfl, file_ext = False, None
++        file_root, file_ext = os.path.splitext(f['path'])
++        file_ext_sec = os.path.splitext(file_root)[1]
++        if file_ext_sec and file_ext_sec + file_ext in EXTRACT_COMMANDS:
++            checkfl, file_ext = True, file_ext_sec + file_ext
++        elif file_ext not in EXTRACT_COMMANDS or file_ext_sec == '.tar':
++            log.debug('Cannot extract file with unknown file type: %s', f['path'])
++        elif file_ext == '.rar' and 'part' in file_ext_sec:
++            part_num = file_ext_sec.split('part')[1]
++            if part_num.isdigit() and int(part_num) != 1:
++                log.debug('Skipping remaining multi-part rar files: %s', f['path'])
++            else:
++                checkfl = True
++        else:
++            checkfl = True
++        return checkfl, file_ext
++
++    def _check_torrent_files(self, tid):
++        files = tid.get_files()
++        for f in files:
++            checkfl, file_ext = self._check_torrent_file(f)
++            if not checkfl:
++                continue
++            else:
++                return True
++        return False
++
+     def _on_torrent_finished(self, torrent_id):
+         """
+         This is called when a torrent finishes and checks if any files to extract.
+         """
+         tid = component.get('TorrentManager').torrents[torrent_id]
+         tid_status = tid.get_status(['download_location', 'name'])
+-
+         files = tid.get_files()
+         for f in files:
+-            file_root, file_ext = os.path.splitext(f['path'])
+-            file_ext_sec = os.path.splitext(file_root)[1]
+-            if file_ext_sec and file_ext_sec + file_ext in EXTRACT_COMMANDS:
+-                file_ext = file_ext_sec + file_ext
+-            elif file_ext not in EXTRACT_COMMANDS or file_ext_sec == '.tar':
+-                log.debug('Cannot extract file with unknown file type: %s', f['path'])
++            checkfl, file_ext = self._check_torrent_file(f)
++            if not checkfl:
+                 continue
+-            elif file_ext == '.rar' and 'part' in file_ext_sec:
+-                part_num = file_ext_sec.split('part')[1]
+-                if part_num.isdigit() and int(part_num) != 1:
+-                    log.debug('Skipping remaining multi-part rar files: %s', f['path'])
+-                    continue
+-
+             cmd = EXTRACT_COMMANDS[file_ext]
+             fpath = os.path.join(
+                 tid_status['download_location'], os.path.normpath(f['path'])
+@@ -179,6 +204,32 @@
+             )
+             d.addCallback(on_extract, torrent_id, fpath)
+ 
++    def _on_pre_torrent_removed(self, torrent_id):
++        """
++        This is called when a torrent is removed.
++        """
++        if self.config['auto_delete']:
++            tid = component.get('TorrentManager').torrents[torrent_id]
++            tid_status = tid.get_status(['download_location', 'name'])
++            if self._check_torrent_files(tid):
++                dest = os.path.normpath(self.config['extract_path'])
++                dest = os.path.join(dest, tid_status['name'])
++                if os.path.isdir(dest):
++                    def on_rmtree_error(function, path, excinfo):
++                        log.error(
++                            'Removing previously extracted files for torrent %s in %s failed: %s',
++                            torrent_id,
++                            dest,
++                            traceback.format_exception(*excinfo),
++                        )
++
++                    log.debug(
++                        'Removing previously extracted files for torrent %s in %s',
++                        torrent_id,
++                        dest,
++                    )
++                    shutil.rmtree(dest, onerror=on_rmtree_error)
++
+     @export
+     def set_config(self, config):
+         """Sets the config dictionary."""
+--- plugins/Extractor-0.7.egg/deluge_extractor/data/extractor.js.dist	2019-06-12 23:17:44.000000000 +0200
++++ plugins/Extractor-0.7.egg/deluge_extractor/data/extractor.js	2020-04-11 14:57:21.503764112 +0200
+@@ -56,6 +56,14 @@
+             boxLabel: _('Create torrent name sub-folder'),
+         });
+ 
++        this.auto_delete = fieldset.add({
++            xtype: 'checkbox',
++            name: 'auto_delete',
++            height: 22,
++            hideLabel: true,
++            boxLabel: _('Auto-delete previously extracted files on deletion'),
++        });
++
+         this.on('show', this.updateConfig, this);
+     },
+ 
+@@ -65,6 +73,7 @@
+ 
+         config['extract_path'] = this.extract_path.getValue();
+         config['use_name_folder'] = this.use_name_folder.getValue();
++        config['auto_delete'] = this.auto_delete.getValue();
+ 
+         deluge.client.extractor.set_config(config);
+     },
+@@ -78,6 +87,7 @@
+             success: function(config) {
+                 this.extract_path.setValue(config['extract_path']);
+                 this.use_name_folder.setValue(config['use_name_folder']);
++                this.auto_delete.setValue(config['auto_delete']);
+             },
+             scope: this,
+         });
+--- plugins/Extractor-0.7.egg/deluge_extractor/data/extractor_prefs.ui.dist	2019-06-12 23:17:44.000000000 +0200
++++ plugins/Extractor-0.7.egg/deluge_extractor/data/extractor_prefs.ui	2020-04-11 14:57:20.911793274 +0200
+@@ -100,6 +100,21 @@
+                     <property name="position">1</property>
+                   </packing>
+                 </child>
++                <child>
++                  <object class="GtkCheckButton" id="chk_auto_delete">
++                    <property name="label" translatable="yes">Auto-delete previously extracted files on deletion</property>
++                    <property name="visible">True</property>
++                    <property name="can_focus">True</property>
++                    <property name="receives_default">False</property>
++                    <property name="tooltip_text" translatable="yes">This option will automatically delete previously extracted files on torrent deletion.</property>
++                    <property name="draw_indicator">True</property>
++                  </object>
++                  <packing>
++                    <property name="expand">False</property>
++                    <property name="fill">False</property>
++                    <property name="position">1</property>
++                  </packing>
++                </child>
+               </object>
+             </child>
+             <child type="label">
+--- plugins/Extractor-0.7.egg/deluge_extractor/gtkui.py.dist	2019-06-12 23:17:44.000000000 +0200
++++ plugins/Extractor-0.7.egg/deluge_extractor/gtkui.py	2020-04-11 14:18:42.325917519 +0200
+@@ -69,6 +69,7 @@
+         config = {
+             'extract_path': path,
+             'use_name_folder': self.builder.get_object('chk_use_name').get_active(),
++            'auto_delete': self.builder.get_object('chk_auto_delete').get_active(),
+         }
+ 
+         client.extractor.set_config(config)
+@@ -92,5 +93,8 @@
+             self.builder.get_object('chk_use_name').set_active(
+                 config['use_name_folder']
+             )
++            self.builder.get_object('chk_auto_delete').set_active(
++                config['auto_delete']
++            )
+ 
+         client.extractor.get_config().addCallback(on_get_config)

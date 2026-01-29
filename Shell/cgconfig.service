@@ -1,0 +1,11 @@
+[Unit]
+Description=setup control group v2 file system
+Documentation=https://www.kernel.org/doc/Documentation/cgroup-v2.txt
+Before=network.target
+
+[Service]
+ExecStart=/lib/systemd/system/cgconfig.sh -v
+Type=oneshot
+
+[Install]
+WantedBy=multi-user.target

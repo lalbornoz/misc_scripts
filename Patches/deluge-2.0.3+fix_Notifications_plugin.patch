@@ -1,0 +1,11 @@
+--- deluge/plugins/Notifications-0.3.egg/deluge_notifications/core.py.dist	2019-06-12 23:17:44.000000000 +0200
++++ deluge/plugins/Notifications-0.3.egg/deluge_notifications/core.py	2020-04-07 15:44:57.443235206 +0200
+@@ -176,7 +176,7 @@
+     def _on_torrent_finished_event(self, torrent_id):
+         log.debug('Handler for TorrentFinishedEvent called for CORE')
+         torrent = component.get('TorrentManager')[torrent_id]
+-        torrent_status = torrent.get_status({})
++        torrent_status = torrent.get_status(['name', 'num_files'])
+         # Email
+         subject = _('Finished Torrent "%(name)s"') % torrent_status
+         message = (

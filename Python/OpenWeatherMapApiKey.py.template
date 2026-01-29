@@ -1,0 +1,11 @@
+#!/usr/bin/env python3
+#
+# OpenWeatherMap.py -- Obtain daily weather from OpenWeatherMap.org
+# Copyright (c) 2018 Lucía Andrea Illanes Albornoz <lucia@luciaillanes.de>
+# This project is licensed under the terms of the MIT licence.
+#
+
+class OpenWeatherMapApiKey(object):
+    openWeatherMapApiKey = None
+
+# vim:expandtab foldmethod=marker sw=4 ts=4 tw=120

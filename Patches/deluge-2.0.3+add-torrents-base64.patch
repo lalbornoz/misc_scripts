@@ -1,0 +1,29 @@
+https://dev.deluge-torrent.org/ticket/2320
+
+--- /usr/lib/python3/dist-packages/deluge/ui/web/json_api.py.dist	2019-06-12 23:17:45.000000000 +0200
++++ /usr/lib/python3/dist-packages/deluge/ui/web/json_api.py	2020-03-21 19:05:25.391934691 +0100
+@@ -724,7 +724,8 @@
+         Add torrents by file
+ 
+         :param torrents: A list of dictionaries containing the torrent \
+-            path and torrent options to add with.
++            path, torrent data and torrent options to add with. Torrent data \
++            is optional and must be encoded with base64.
+         :type torrents: list
+ 
+         ::
+@@ -748,8 +749,12 @@
+                 deferreds.append(d)
+             else:
+                 filename = os.path.basename(torrent['path'])
+-                with open(torrent['path'], 'rb') as _file:
+-                    fdump = b64encode(_file.read())
++                if not os.path.exists(filename):
++                    mode = 'wb'
++                else:
++                    mode = 'rb'
++                with open(torrent['path'], mode) as _file:
++                    fdump = torrent.pop("data", None) or base64.encodestring(open(torrent["path"], "rb").read())
+                 log.info(
+                     'Adding torrent from file `%s` with options `%r`',
+                     filename,

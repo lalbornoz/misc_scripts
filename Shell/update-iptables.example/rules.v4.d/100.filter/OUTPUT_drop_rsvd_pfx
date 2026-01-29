@@ -1,0 +1,18 @@
+-d 0.0.0.0/8 -m comment --comment "!*: Drop ingress BCP 38/RFC 6890 traffic" -j DROP
+-d 10.0.0.0/8 -m comment --comment "!*: Drop ingress BCP 38/RFC 6890 traffic" -j DROP
+-d 100.64.0.0/10 -m comment --comment "!*: Drop ingress BCP 38/RFC 6890 traffic" -j DROP
+-d 127.0.0.0/8 -m comment --comment "!*: Drop ingress BCP 38/RFC 6890 traffic" -j DROP
+-d 169.254.0.0/16 -m comment --comment "!*: Drop ingress BCP 38/RFC 6890 traffic" -j DROP
+-d 172.16.0.0/12 -m comment --comment "!*: Drop ingress BCP 38/RFC 6890 traffic" -j DROP
+-d 192.0.0.0/24 -m comment --comment "!*: Drop ingress BCP 38/RFC 6890 traffic" -j DROP
+-d 192.0.2.0/24 -m comment --comment "!*: Drop ingress BCP 38/RFC 6890 traffic" -j DROP
+-d 192.168.0.0/16 -m comment --comment "!*: Drop ingress BCP 38/RFC 6890 traffic" -j DROP
+-d 192.88.99.0/24 -m comment --comment "!*: Drop ingress BCP 38/RFC 6890 traffic" -j DROP
+-d 198.18.0.0/15 -m comment --comment "!*: Drop ingress BCP 38/RFC 6890 traffic" -j DROP
+-d 198.51.100.0/24 -m comment --comment "!*: Drop ingress BCP 38/RFC 6890 traffic" -j DROP
+-d 203.0.113.0/24 -m comment --comment "!*: Drop ingress BCP 38/RFC 6890 traffic" -j DROP
+-d 224.0.0.0/4 -m comment --comment "!*: Drop ingress multicast traffic" -j DROP
+-d 240.0.0.0/4 -m comment --comment "!*: Drop ingress BCP 38/RFC 6890 traffic" -j DROP
+-d 255.255.255.255/32 -m comment --comment "!*: Drop ingress BCP 38/RFC 6890 traffic" -j DROP
+
+# vim:filetype=conf

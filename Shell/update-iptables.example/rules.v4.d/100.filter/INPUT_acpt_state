@@ -1,0 +1,6 @@
+-m conntrack --ctstate INVALID -j DROP
+-p icmp -m icmp --icmp-type any -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-p tcp -m tcp -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-p udp -m udp -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+
+# vim:filetype=conf

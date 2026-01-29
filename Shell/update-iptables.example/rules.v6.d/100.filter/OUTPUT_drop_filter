@@ -1,0 +1,11 @@
+-o lo -j ACCEPT
+
+-s 1:2::3:4/64 -o eth0 -j RETURN
+-s fe80::/10 -j RETURN
+-d ff00::/8 -j RETURN
+-s ff00::/8 -j RETURN
+
+-j NFLOG --nflog-prefix "ip6tables/OUTPUT_drop_filter "
+-j DROP
+
+# vim:filetype=conf

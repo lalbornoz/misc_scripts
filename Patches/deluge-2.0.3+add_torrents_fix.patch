@@ -1,0 +1,11 @@
+--- ui/web/json_api.py.dist	2019-06-12 23:17:45.000000000 +0200
++++ ui/web/json_api.py	2020-03-25 14:21:59.949587380 +0100
+@@ -759,7 +759,7 @@
+                     filename, fdump, torrent['options']
+                 )
+                 deferreds.append(d)
+-        return DeferredList(deferreds, consumeErrors=False)
++        return DeferredList(deferreds, consumeErrors=True, fireOnOneErrback=True)
+ 
+     def _get_host(self, host_id):
+         """Information about a host from supplied host id.

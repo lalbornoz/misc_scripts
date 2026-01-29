@@ -1,0 +1,549 @@
+diff --git a/Makefile.in b/Makefile.in
+index 6f001bb3..cc9cc1c8 100644
+--- a/Makefile.in
++++ b/Makefile.in
+@@ -61,6 +61,7 @@ MANFMT=@MANFMT@
+ MKDIR_P=@MKDIR_P@
+ 
+ TARGETS=ssh$(EXEEXT) sshd$(EXEEXT) ssh-add$(EXEEXT) ssh-keygen$(EXEEXT) ssh-keyscan${EXEEXT} ssh-keysign${EXEEXT} ssh-pkcs11-helper$(EXEEXT) ssh-agent$(EXEEXT) scp$(EXEEXT) sftp-server$(EXEEXT) sftp$(EXEEXT)
++TARGETS+=authfd-pageant-bridge${EXEEXT}
+ 
+ XMSS_OBJS=\
+ 	ssh-xmss.o \
+@@ -84,7 +85,7 @@ LIBOPENSSH_OBJS=\
+ 	${XMSS_OBJS}
+ 
+ LIBSSH_OBJS=${LIBOPENSSH_OBJS} \
+-	authfd.o authfile.o \
++	authfd.o authfd-pageant.o authfile.o \
+ 	canohost.o channels.o cipher.o cipher-aes.o cipher-aesctr.o \
+ 	cipher-ctr.o cleanup.o \
+ 	compat.o crc32.o fatal.o hostfile.o \
+@@ -121,6 +122,8 @@ SSHDOBJS=sshd.o auth-rhosts.o auth-passwd.o \
+ 	sandbox-seccomp-filter.o sandbox-capsicum.o sandbox-pledge.o \
+ 	sandbox-solaris.o uidswap.o
+ 
++AUTHFD_PAGEANT_BRIDGEOBJS=authfd-pageant-bridge.o xmalloc.o
++
+ MANPAGES	= moduli.5.out scp.1.out ssh-add.1.out ssh-agent.1.out ssh-keygen.1.out ssh-keyscan.1.out ssh.1.out sshd.8.out sftp-server.8.out sftp.1.out ssh-keysign.8.out ssh-pkcs11-helper.8.out sshd_config.5.out ssh_config.5.out
+ MANPAGES_IN	= moduli.5 scp.1 ssh-add.1 ssh-agent.1 ssh-keygen.1 ssh-keyscan.1 ssh.1 sshd.8 sftp-server.8 sftp.1 ssh-keysign.8 ssh-pkcs11-helper.8 sshd_config.5 ssh_config.5
+ MANTYPE		= @MANTYPE@
+@@ -155,6 +158,7 @@ all: $(CONFIGFILES) $(MANPAGES) $(TARGETS)
+ 
+ $(LIBSSH_OBJS): Makefile.in config.h
+ $(SSHOBJS): Makefile.in config.h
++$(AUTHFD_PAGEANT_BRIDGEOBJS): Makefile.in config.h
+ $(SSHDOBJS): Makefile.in config.h
+ 
+ .c.o:
+@@ -172,9 +176,6 @@ libssh.a: $(LIBSSH_OBJS)
+ ssh$(EXEEXT): $(LIBCOMPAT) libssh.a $(SSHOBJS)
+ 	$(LD) -o $@ $(SSHOBJS) $(LDFLAGS) -lssh -lopenbsd-compat $(SSHLIBS) $(LIBS) $(GSSLIBS)
+ 
+-sshd$(EXEEXT): libssh.a	$(LIBCOMPAT) $(SSHDOBJS)
+-	$(LD) -o $@ $(SSHDOBJS) $(LDFLAGS) -lssh -lopenbsd-compat $(SSHDLIBS) $(LIBS) $(GSSLIBS) $(K5LIBS)
+-
+ scp$(EXEEXT): $(LIBCOMPAT) libssh.a scp.o progressmeter.o
+ 	$(LD) -o $@ scp.o progressmeter.o $(LDFLAGS) -lssh -lopenbsd-compat $(LIBS)
+ 
+@@ -206,6 +207,9 @@ sftp$(EXEEXT): $(LIBCOMPAT) libssh.a sftp.o sftp-client.o sftp-common.o sftp-glo
+ logintest: logintest.o $(LIBCOMPAT) libssh.a loginrec.o
+ 	$(LD) -o $@ logintest.o $(LDFLAGS) loginrec.o -lopenbsd-compat -lssh $(LIBS)
+ 
++authfd-pageant-bridge$(EXEEXT): libssh.a $(AUTHFD_PAGEANT_BRIDGEOBJS)
++	$(LD) -o $@ $(AUTHFD_PAGEANT_BRIDGEOBJS) $(LDFLAGS) -lssh -lopenbsd-compat $(SSHLIBS) $(LIBS)
++
+ $(MANPAGES): $(MANPAGES_IN)
+ 	if test "$(MANTYPE)" = "cat"; then \
+ 		manpage=$(srcdir)/`echo $@ | sed 's/\.[1-9]\.out$$/\.0/'`; \
+diff --git a/authfd-pageant-bridge.c b/authfd-pageant-bridge.c
+new file mode 100644
+index 00000000..af820071
+--- /dev/null
++++ b/authfd-pageant-bridge.c
+@@ -0,0 +1,124 @@
++/* $OpenBSD$ */
++/*
++ * Author: Lucía Andrea Illanes Albornoz <lucia@luciaillanes.de>
++ * Copyright (c) 2019, 2026 Lucía Andrea Illanes Albornoz <lucia@luciaillanes.de>
++ *                    All rights reserved
++ * Functions for connecting the local Pageant authentication agent.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
++ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
++ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
++ * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
++ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
++ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
++ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
++ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
++ * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ */
++
++#include "includes.h"
++#ifdef HAVE_CYGWIN
++#include <windows.h>
++#include <sddl.h>
++#include "authfd-pageant.h"
++
++#define PIPE_BUFFER_SIZE		8192
++#define PIPE_MAX_INSTANCES		64
++#define PIPE_NAME			"\\\\.\\pipe\\authfd-pageant-agent"
++#define PIPE_OPEN_MODE			(PIPE_ACCESS_DUPLEX)
++#define PIPE_PIPE_MODE			(PIPE_READMODE_MESSAGE | PIPE_REJECT_REMOTE_CLIENTS | PIPE_TYPE_MESSAGE | PIPE_WAIT)
++#define PIPE_SECURITY_DESCRIPTOR	"D:(A;;GA;;;WD)(A;;GA;;;SY)"	/* Allow GENERIC_ALL access to Creator owner & Local system */
++
++static int
++HandlePipeClient(HANDLE hPipe)
++{
++	DWORD cbBufferSize, cbMsgLen, cbNumberOfBytesRead, cbNumberOfBytesWritten;
++	char *lpBuffer;
++	int rc = 0;
++
++	if (!hPipe) {
++		goto out;
++	} else if (!(lpBuffer = calloc(cbBufferSize = PIPE_BUFFER_SIZE, sizeof(*lpBuffer)))) {
++		goto out;
++	} else if (!ReadFile(hPipe, lpBuffer, cbBufferSize, &cbNumberOfBytesRead, NULL)) {
++		goto out;
++	} else {
++		cbMsgLen = AGENT_MSGLEN(lpBuffer);
++		if (cbMsgLen > cbNumberOfBytesRead) {
++			goto out;
++		} else if ((rc = PageantRequestReply(lpBuffer)) < 0) {
++			goto out;
++		} else {
++			cbMsgLen = AGENT_MSGLEN(lpBuffer);
++			if (cbMsgLen > cbBufferSize) {
++				goto out;
++			} else if (!WriteFile(hPipe, lpBuffer, cbMsgLen, &cbNumberOfBytesWritten, NULL)) {
++				goto out;
++			} else if (cbNumberOfBytesWritten != cbMsgLen) {
++				goto out;
++			} else {
++				rc = 1;
++			}
++		}
++	}
++out:
++	if (hPipe) {
++		FlushFileBuffers(hPipe);
++		DisconnectNamedPipe(hPipe);
++		CloseHandle(hPipe);
++	}
++	return rc;
++}
++
++int
++main(int argc, char **argv)
++{
++	int cbPipeNameLen;
++	HANDLE hPipe = NULL;
++	char *lpPipeName;
++	DWORD rc = EXIT_FAILURE;
++	SECURITY_ATTRIBUTES SecurityAttributes;
++	PSECURITY_DESCRIPTOR SecurityDescriptor = NULL;
++
++	if (((cbPipeNameLen = snprintf(NULL, 0, PIPE_NAME)) == -1) ||
++	    !(lpPipeName = calloc(cbPipeNameLen + 1, sizeof(*lpPipeName))) ||
++	    snprintf(lpPipeName, cbPipeNameLen + 1, PIPE_NAME) != cbPipeNameLen)
++		goto out;
++	else {
++		SecurityAttributes.bInheritHandle = FALSE;
++		SecurityAttributes.nLength = sizeof(SecurityAttributes);
++		if (!ConvertStringSecurityDescriptorToSecurityDescriptor(
++				PIPE_SECURITY_DESCRIPTOR, SDDL_REVISION_1, &SecurityDescriptor, NULL))
++			goto out;
++		else {
++			SecurityAttributes.lpSecurityDescriptor = SecurityDescriptor;
++			hPipe = CreateNamedPipe(
++					lpPipeName, PIPE_OPEN_MODE, PIPE_PIPE_MODE, PIPE_MAX_INSTANCES,
++					PIPE_BUFFER_SIZE, PIPE_BUFFER_SIZE, 0, &SecurityAttributes);
++			if (hPipe != INVALID_HANDLE_VALUE &&
++			    (ConnectNamedPipe(hPipe, NULL) || GetLastError() == ERROR_PIPE_CONNECTED) &&
++			    HandlePipeClient(hPipe))
++				rc = EXIT_SUCCESS;
++		}
++	}
++
++out:
++	if (hPipe)
++		CloseHandle(hPipe);
++	if (SecurityDescriptor)
++		LocalFree(SecurityDescriptor);
++	if (lpPipeName)
++		free(lpPipeName);
++	return rc;
++}
++#endif
+diff --git a/authfd-pageant.c b/authfd-pageant.c
+new file mode 100644
+index 00000000..def031f3
+--- /dev/null
++++ b/authfd-pageant.c
+@@ -0,0 +1,253 @@
++/* $OpenBSD$ */
++/*
++ * Author: Lucía Andrea Illanes Albornoz <lucia@luciaillanes.de>
++ * Copyright (c) 2019, 2026 Lucía Andrea Illanes Albornoz <lucia@luciaillanes.de>
++ *                    All rights reserved
++ * Functions for connecting the local Pageant authentication agent.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
++ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
++ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
++ * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
++ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
++ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
++ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
++ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
++ * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ */
++
++#include "includes.h"
++#ifdef HAVE_CYGWIN
++#include <fcntl.h>
++#include <unistd.h>
++#include <errno.h>
++
++#include "ssh.h"
++#include "sshbuf.h"
++#include "authfd.h"
++#include "ssherr.h"
++
++#include <windows.h>
++#include "authfd-pageant.h"
++
++#define AGENT_COPYDATA_ID	0x804e50ba	/* random goop */
++#define AGENT_MAX_MSGLEN 	8192
++#define AGENT_REQUEST_FMT	"PageantRequest%08x"
++#define AGENT_REQUEST_STRING	"PageantRequest12345678"
++#define AGENT_WINDOW_NAME	"Pageant"
++#define MAX_AGENT_REPLY_LEN	(256 * 1024) 	/* Max bytes in agent reply */
++
++static PSID
++GetCurrentProcessSid(void)
++{
++	TOKEN_USER *CurrentTokenUser = NULL;
++	PSID Sid = NULL;
++	DWORD SidLength;
++	HANDLE TokenHandle = NULL;
++	DWORD TokenLength;
++
++	if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &TokenHandle))
++		goto out;
++	else if (!GetTokenInformation(TokenHandle, TokenUser, NULL, 0, &TokenLength) &&
++		 (GetLastError() != ERROR_INSUFFICIENT_BUFFER))
++		goto out;
++	else {
++		CurrentTokenUser = calloc(1, TokenLength);
++		if (!GetTokenInformation(TokenHandle, TokenUser, CurrentTokenUser, TokenLength, &TokenLength))
++			goto out;
++		else {
++			SidLength = GetLengthSid(CurrentTokenUser->User.Sid);
++			if ((Sid = calloc(1, SidLength)) &&
++			    (!CopySid(SidLength, Sid, CurrentTokenUser->User.Sid))) {
++				free(Sid); Sid = NULL;
++			}
++		}
++	}
++out:
++	if (CurrentTokenUser)
++		free(CurrentTokenUser);
++	if (TokenHandle)
++		CloseHandle(TokenHandle);
++	return Sid;
++}
++
++HANDLE
++PageantDetect(void)
++{
++	return FindWindow(AGENT_WINDOW_NAME, AGENT_WINDOW_NAME);
++}
++
++int
++PageantRequestReply(void *buf)
++{
++	COPYDATASTRUCT CopyDataStruct;
++	SECURITY_ATTRIBUTES FileMappingAttributes;
++	HANDLE hFileMappingObject = NULL;
++	HWND hwnd;
++	char lpName[] = AGENT_REQUEST_STRING;
++	PSECURITY_DESCRIPTOR pSecurityDescriptor = NULL;
++	PSID UserSid = NULL;
++
++	size_t lpName_len;
++#if BYTE_ORDER == LITTLE_ENDIAN
++	static const char reply_error[5] = {0, 0, 0, 1, SSH_AGENT_FAILURE};
++#else
++	static const char reply_error[5] = {1, 0, 0, 0, SSH_AGENT_FAILURE};
++#endif
++	void *p = NULL;
++	int rc = SSH_ERR_INTERNAL_ERROR;
++
++	if (!buf)
++		goto out;
++	else if ((hwnd = PageantDetect())) {
++		lpName_len = snprintf(lpName, sizeof(lpName), AGENT_REQUEST_FMT, (unsigned)GetCurrentThreadId());
++		if (lpName_len >= sizeof(lpName))
++			goto out;
++		else if (!(UserSid = GetCurrentProcessSid()))
++			goto out;
++		else if (!(pSecurityDescriptor = calloc(1, SECURITY_DESCRIPTOR_MIN_LENGTH)))
++			goto out;
++		else if (!InitializeSecurityDescriptor(pSecurityDescriptor, SECURITY_DESCRIPTOR_REVISION))
++			goto out;
++		else if (!SetSecurityDescriptorOwner(pSecurityDescriptor, UserSid, FALSE))
++			goto out;
++		else {
++			FileMappingAttributes.bInheritHandle = TRUE;
++			FileMappingAttributes.lpSecurityDescriptor = pSecurityDescriptor;
++			FileMappingAttributes.nLength = sizeof(FileMappingAttributes);
++			if (!(hFileMappingObject = CreateFileMapping(INVALID_HANDLE_VALUE, &FileMappingAttributes, PAGE_READWRITE, 0, AGENT_MAX_MSGLEN, lpName)))
++				goto out;
++			else if (!(p = MapViewOfFile(hFileMappingObject, FILE_MAP_WRITE, 0, 0, 0)))
++				goto out;
++			else {
++				memcpy(p, buf, AGENT_MSGLEN(buf));
++				if (AGENT_MSGLEN(p) <= AGENT_MAX_MSGLEN) {
++					CopyDataStruct.cbData = lpName_len + 1;
++					CopyDataStruct.dwData = AGENT_COPYDATA_ID;
++					CopyDataStruct.lpData = lpName;
++					if ((rc = SendMessage(hwnd, WM_COPYDATA, (WPARAM)NULL, (LPARAM)&CopyDataStruct)))
++						memcpy(buf, p, AGENT_MSGLEN(p));
++					else
++						rc = SSH_ERR_INTERNAL_ERROR;
++				}
++			}
++		}
++	}
++out:
++	if (hFileMappingObject) {
++		if (p)
++			UnmapViewOfFile(p);
++		CloseHandle(hFileMappingObject);
++	}
++	if (pSecurityDescriptor)
++		free(pSecurityDescriptor);
++	if (UserSid)
++		free(UserSid);
++	if (rc < 0)
++		memcpy(buf, reply_error, AGENT_MSGLEN(reply_error));
++	return rc;
++}
++
++/* Returns the number of the authentication fd, or -1 if there is none. */
++int
++ssh_get_authentication_socket_pageant(int *fdp)
++{
++	int sock, oerrno;
++
++	if (PageantDetect()) {
++		sock = open("/dev/null", O_RDWR);
++		if (fcntl(sock, F_SETFD, FD_CLOEXEC) == -1) {
++			oerrno = errno;
++			close(sock);
++			errno = oerrno;
++			return SSH_ERR_SYSTEM_ERROR;
++		}
++	} else
++		return SSH_ERR_AGENT_NOT_PRESENT;
++	if (fdp != NULL)
++		*fdp = sock;
++	else
++		close(sock);
++	return 0;
++}
++
++/* Communicate with agent: send request and read reply */
++int
++ssh_request_reply_pageant(int sock, struct sshbuf *request, struct sshbuf *reply)
++{
++	int r;
++	size_t len;
++	char buf[AGENT_MAX_MSGLEN];
++
++	/* Get the length of the message, and format it in the buffer. */
++	len = sshbuf_len(request);
++	POKE_U32(buf, len);
++
++	POKE_U32(buf, len);
++	memcpy(&buf[4], sshbuf_mutable_ptr(request), len);
++#if 0
++	if ((r = PageantRequestReply(buf)) < 0)
++		return r;
++#else
++	DWORD cbNumberOfBytesRead, cbNumberOfBytesWritten;
++	HANDLE hPipe;
++	PROCESS_INFORMATION ProcessInformation;
++	int rc = 0;
++	STARTUPINFO StartupInfo;
++
++	memset(&StartupInfo, 0, sizeof(StartupInfo));
++	StartupInfo.cb = sizeof(StartupInfo);
++	if (!CreateProcess("authfd-pageant-bridge.exe", NULL, NULL, NULL, FALSE,
++			NORMAL_PRIORITY_CLASS, NULL, NULL, &StartupInfo, &ProcessInformation))
++		return SSH_ERR_INVALID_FORMAT;
++	else {
++		CloseHandle(ProcessInformation.hProcess);
++		CloseHandle(ProcessInformation.hThread);
++		do {
++			hPipe = CreateFile("\\\\.\\pipe\\authfd-pageant-agent",
++					   GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
++			if (hPipe == INVALID_HANDLE_VALUE)
++				switch (GetLastError()) {
++				case ERROR_PIPE_BUSY:
++					WaitNamedPipe("\\\\.\\pipe\\authfd-pageant-agent", NMPWAIT_WAIT_FOREVER);
++					continue;
++				case ERROR_FILE_NOT_FOUND:
++					/* XXX fix */
++					continue;
++				default:
++					return SSH_ERR_INVALID_FORMAT;
++				}
++			else
++				break;
++		} while (1);
++		if (!WriteFile(hPipe, buf, len + 4, &cbNumberOfBytesWritten, NULL) ||
++		    !ReadFile(hPipe, buf, sizeof(buf), &cbNumberOfBytesRead, NULL))
++			rc = SSH_ERR_INVALID_FORMAT;
++		CloseHandle(hPipe);
++		if (rc < 0)
++			return rc;
++	}
++#endif
++
++	/* Extract the length, and check it for sanity. */
++	len = PEEK_U32(buf);
++	if (len > MAX_AGENT_REPLY_LEN)
++		return SSH_ERR_INVALID_FORMAT;
++
++	/* Read the rest of the response in to the buffer. */
++	sshbuf_reset(reply);
++	if ((r = sshbuf_put(reply, &buf[4], len)))
++		return r;
++	return 0;
++}
++#endif
+diff --git a/authfd-pageant.h b/authfd-pageant.h
+new file mode 100644
+index 00000000..3c8d6c10
+--- /dev/null
++++ b/authfd-pageant.h
+@@ -0,0 +1,46 @@
++/* $OpenBSD$ */
++/*
++ * Author: Lucía Andrea Illanes Albornoz <lucia@luciaillanes.de>
++ * Copyright (c) 2019, 2026 Lucía Andrea Illanes Albornoz <lucia@luciaillanes.de>
++ *                    All rights reserved
++ * Functions for connecting the local Pageant authentication agent.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
++ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
++ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
++ * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
++ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
++ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
++ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
++ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
++ * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ */
++
++#ifndef AUTHFD_PAGEANT_H
++#define AUTHFD_PAGEANT_H
++#ifdef HAVE_CYGWIN
++
++#define AGENT_COPYDATA_ID	0x804e50ba	/* random goop */
++#define AGENT_MAX_MSGLEN 	8192
++#define AGENT_MSGLEN(p)		(ntohl(*(const uint32_t *)(p)) + 4)
++#define AGENT_REQUEST_FMT	"PageantRequest%08x"
++#define AGENT_REQUEST_STRING	"PageantRequest12345678"
++#define AGENT_WINDOW_NAME	"Pageant"
++
++HANDLE PageantDetect(void);
++int PageantRequestReply(void *buf);
++int ssh_get_authentication_socket_pageant(int *fdp);
++int ssh_request_reply_pageant(int sock, struct sshbuf *request, struct sshbuf *reply);
++
++#endif
++#endif				/* AUTHFD_PAGEANT_H */
+diff --git a/authfd.c b/authfd.c
+index 95348abf..0c888005 100644
+--- a/authfd.c
++++ b/authfd.c
+@@ -61,6 +61,10 @@
+ #include "misc.h"
+ #include "ssherr.h"
+ 
++#ifdef HAVE_CYGWIN
++#include "authfd-pageant.h"
++#endif
++
+ #define MAX_AGENT_IDENTITIES	2048		/* Max keys in agent reply */
+ #define MAX_AGENT_REPLY_LEN	(256 * 1024) 	/* Max bytes in agent reply */
+ 
+@@ -95,7 +99,11 @@ ssh_get_authentication_socket(int *fdp)
+ 
+ 	authsocket = getenv(SSH_AUTHSOCKET_ENV_NAME);
+ 	if (authsocket == NULL || *authsocket == '\0')
++#ifndef HAVE_CYGWIN
+ 		return SSH_ERR_AGENT_NOT_PRESENT;
++#else
++		return ssh_get_authentication_socket_pageant(fdp);
++#endif
+ 
+ 	memset(&sunaddr, 0, sizeof(sunaddr));
+ 	sunaddr.sun_family = AF_UNIX;
+@@ -127,6 +135,11 @@ ssh_request_reply(int sock, struct sshbuf *request, struct sshbuf *reply)
+ 	size_t l, len;
+ 	char buf[1024];
+ 
++#ifdef HAVE_CYGWIN
++	if (PageantDetect())
++		return ssh_request_reply_pageant(sock, request, reply);
++#endif
++
+ 	/* Get the length of the message, and format it in the buffer. */
+ 	len = sshbuf_len(request);
+ 	POKE_U32(buf, len);
+@@ -173,6 +186,10 @@ ssh_close_authentication_socket(int sock)
+ {
+ 	if (getenv(SSH_AUTHSOCKET_ENV_NAME))
+ 		close(sock);
++#ifdef HAVE_CYGWIN
++	else if (PageantDetect() && sock != -1)
++		close(sock);
++#endif
+ }
+ 
+ /* Lock/unlock agent */

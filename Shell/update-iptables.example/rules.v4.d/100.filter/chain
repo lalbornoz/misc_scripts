@@ -1,0 +1,36 @@
+:FORWARD DROP [0:0]
+:INPUT DROP [0:0]
+:OUTPUT DROP [0:0]
+:INPUT_acpt_state - [0:0]
+:INPUT_acpt_svc - [0:0]
+:INPUT_drop_filter - [0:0]
+:INPUT_drop_rsvd_local - [0:0]
+:INPUT_drop_rsvd_pfx - [0:0]
+:INPUT_drop_svc_absent - [0:0]
+:OUTPUT_acpt_new - [0:0]
+:OUTPUT_acpt_new_udp - [0:0]
+:OUTPUT_acpt_state - [0:0]
+:OUTPUT_drop_filter - [0:0]
+:OUTPUT_drop_excessive_fin - [0:0]
+:OUTPUT_drop_new - [0:0]
+:OUTPUT_drop_port_unreachable - [0:0]
+:OUTPUT_drop_rsvd_local - [0:0]
+:OUTPUT_drop_rsvd_pfx - [0:0]
+-A FORWARD -j NFLOG --nflog-prefix "iptables/FORWARD "
+-A INPUT -i lo -j ACCEPT
+-A INPUT -j INPUT_drop_filter
+-A INPUT -j INPUT_drop_svc_absent
+-A INPUT -j INPUT_acpt_state
+-A INPUT -j INPUT_acpt_svc
+-A INPUT -j NFLOG --nflog-prefix "iptables/INPUT "
+-A OUTPUT -o lo -j ACCEPT
+-A OUTPUT -j OUTPUT_drop_filter
+-A OUTPUT -j OUTPUT_drop_port_unreachable
+-A OUTPUT -j OUTPUT_drop_excessive_fin
+-A OUTPUT -j OUTPUT_acpt_state
+-A OUTPUT -j OUTPUT_drop_new
+-A OUTPUT -j OUTPUT_acpt_new
+-A OUTPUT -j OUTPUT_acpt_new_udp
+-A OUTPUT -j NFLOG --nflog-prefix "iptables/OUTPUT "
+
+# vim:filetype=conf

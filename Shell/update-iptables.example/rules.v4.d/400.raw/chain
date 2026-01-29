@@ -1,0 +1,4 @@
+:PREROUTING ACCEPT [0:0]
+:OUTPUT ACCEPT [0:0]
+
+# vim:filetype=conf
