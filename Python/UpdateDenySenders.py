@@ -90,12 +90,12 @@ class DenySendersList(object):
     # [[[ def getEmailAddress(self, buffer)
     def getEmailAddress(self, buffer):
         matches = re.search(self.emailSenderRegex, buffer)
-        if matches == None:
+        if matches is None:
             self.printWarnErr("warning: Sender header not found in email on stdin, ignoring.")
             return False, None
         else:
             address = matches.group(1)
-            if not "@" in address:
+            if "@" not in address:
                 self.printWarnErr("warning: invalid Sender header email address {} in email on stdin, ignoring.".format(address))
                 return False, None
             else:
@@ -104,11 +104,11 @@ class DenySendersList(object):
     # [[[ def getEmailDomainTld(self, address)
     def getEmailDomainTld(self, address):
         address = address.split("@")[-1:][0]
-        address = ".".join([l for l in address.split(".") if len(l) > 0])
+        address = ".".join([L for L in address.split(".") if len(L) > 0])
         tldExtractResult = tldextract.extract(address)
 
         if len(tldExtractResult.suffix) == 0:
-            self.printWarnErr("warning: missing TLD in Sender header email address part {} in {}, ignoring.".format(address, fname))
+            self.printWarnErr("warning: missing TLD in Sender header email address part {}, ignoring.".format(address))
             return False, None
         else:
             addressDomainTld = tldExtractResult.domain + "." + tldExtractResult.suffix
@@ -117,12 +117,12 @@ class DenySendersList(object):
     # [[[ def writeLine(self, file, lineNew)
     def writeLine(self, file, lineNew):
         lines = file.read().split("\n")
-        lines = [l for l in lines if len(l) > 0]
+        lines = [L for L in lines if len(L) > 0]
 
         if lineNew.upper() in map(str.upper, lines):
             self.printWarnErr("warning: duplicate entry {} in {}, ignoring.".format(lineNew, self.listFname))
         else:
-            if not self.logFile == None:
+            if self.logFile is not None:
                 print("Adding {} to {}".format(lineNew, self.listFname), file=self.logFile)
             if "r" in self.options:
                 self.printReportLine("Adding {} to {}".format(lineNew, self.listFname))
@@ -145,13 +145,13 @@ class DenySendersList(object):
         if "h" in options:
             self.printUsage()
             return False, 0, None
-        elif ((not "a" in options) and (not "d" in options))\
+        elif (("a" not in options) and ("d" not in options))\
         or   ((    "a" in options) and (    "d" in options)):
             self.printUsage("error: either of -a or -d must be specified")
             return False, 1, None
         else:
             homeDname = os.environ["HOME"].rstrip("/")
-            if not "f" in options:
+            if "f" not in options:
                 if "a" in options:
                     options["f"] = homeDname + "/" + ".deny_senders"
                 elif "d" in options:
@@ -268,7 +268,7 @@ A copy of the deny list file is saved with the file extension ".bak" on each run
                     lineNew = '^(.*\\.)?{}'.format(re.escape(emailAddress))
                 self.writeLine(listFile, lineNew)
 
-        if not self.logFile == None:
+        if self.logFile is not None:
             self.logFile.close()
 
         if "r" in self.options:
