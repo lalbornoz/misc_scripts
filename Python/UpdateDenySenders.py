@@ -265,7 +265,7 @@ A copy of the deny list file is saved with the file extension ".bak" on each run
                 if "a" in self.options:
                     lineNew = emailAddress
                 elif "d" in self.options:
-                    lineNew = '^(.*\\.)?{}'.format(re.escape(emailAddress))
+                    lineNew = '^(.*\\.)?{}$'.format(re.escape(emailAddress))
                 self.writeLine(listFile, lineNew)
 
         if self.logFile is not None:
