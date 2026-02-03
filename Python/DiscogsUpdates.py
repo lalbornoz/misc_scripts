@@ -6,7 +6,7 @@
 #
 
 from email.message import EmailMessage
-from getopt import getopt, GetoptError
+from getopt import getopt
 import daemon, json, logging, os, requests, subprocess, sys, time
 
 class DiscogsUpdatesFormatter(logging.Formatter):
@@ -17,7 +17,7 @@ class DiscogsUpdatesFormatter(logging.Formatter):
         loggingFormat = self.FORMATS.get(record.levelno, self.FORMATS["DEFAULT"])
         return logging.Formatter(loggingFormat).format(record)
     def formatTime(self, record, datefmt=None):
-        return time.strftime(datefmt if datefmt != None else "%d-%^b-%Y %H:%M:%S")
+        return time.strftime(datefmt if datefmt is not None else "%d-%^b-%Y %H:%M:%S")
     def __init__(self, toTerminal):
         if toTerminal:
             self.FORMATS[logging.DEBUG] = "\x1b[33m%(asctime)s\x1b[0m \x1b[36m%(msg)s\x1b[0m"
@@ -76,7 +76,7 @@ class DiscogsUpdates(object):
     # }}}
     # {{{ _dataChangeNotify(self, changeFlag, data, discogsDb, releases)
     def _dataChangeNotify(self, changeFlag, data, discogsDb, releases):
-        if changeFlag and self.options["mail"] != None:
+        if changeFlag and self.options["mail"] is not None:
             content = ""
             for release in releases:
                 dbValue, message = discogsDb[release], EmailMessage()
@@ -89,7 +89,7 @@ class DiscogsUpdates(object):
                 self.logger.debug("sending change notification email from {self.options[mail][from]} to {self.options[mail][to]}...".format(**locals()))
                 p = subprocess.Popen(("/usr/sbin/sendmail", "-t", "-oi",), stdin=subprocess.PIPE)
                 p.communicate(message.as_bytes())
-            except:
+            except Exception:
                 self.logger.error("exception during subprocess.Popen(): {}".format(sys.exc_info()[1]))
                 return False
             return True
@@ -155,15 +155,15 @@ class DiscogsUpdates(object):
         optionsList, args = getopt(argv[1:], self.optionsString)
         for optionChar, optionArg in optionsList:
             optionName = self.optionsStringMap[optionChar[1:]]
-            if type(self.optionsDefault[optionName]) == bool:
+            if type(self.optionsDefault[optionName]) is bool:
                 options[optionName] = True
-            elif type(self.optionsDefault[optionName]) == int:
+            elif type(self.optionsDefault[optionName]) is int:
                 options[optionName] = int(optionArg)
             else:
                 options[optionName] = optionArg
         if options["help"]:
             self._usage(argv[0], options); exit(0);
-        elif (len(args) == 0) and (options["wantListUser"] == None):
+        elif (len(args) == 0) and (options["wantListUser"] is None):
             print("error: no release(s) specified", file=sys.stderr)
             self._usage(argv[0], options); exit(1);
         else:
@@ -177,13 +177,13 @@ class DiscogsUpdates(object):
             loggingHandler = logging.StreamHandler(sys.stderr)
             loggingHandler.setFormatter(DiscogsUpdatesFormatter(not self.options["daemonise"]))
             self.logger.addHandler(loggingHandler)
-            if self.options["wantListUser"] != None:
+            if self.options["wantListUser"] is not None:
                 self.args = self._wantListLoad(self.apiUrlBase, self.options["wantListUser"])
-                if self.args == None:
+                if self.args is None:
                     exit(1)
             else:
                 self.args = args
-            if self.options["mail"] != None:
+            if self.options["mail"] is not None:
                 self.options["mail"] = self.options["mail"].split(":")
                 if len(self.options["mail"]) != 2:
                     print("error: invalid -m argument", file=sys.stderr)
