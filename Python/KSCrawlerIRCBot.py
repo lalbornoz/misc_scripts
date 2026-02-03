@@ -11,8 +11,7 @@
 import daemon
 import json
 import logging
-import tornado.web
-from socket import AF_INET, SOCK_STREAM, socket
+from socket import socket, AF_INET, SOCK_STREAM
 from tornado.gen import coroutine
 from tornado.httpclient import AsyncHTTPClient
 from tornado.ioloop import IOLoop, PeriodicCallback
