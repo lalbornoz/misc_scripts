@@ -14,9 +14,9 @@
 #
 
 from datetime import datetime
-from getopt import getopt, GetoptError
+from getopt import getopt
 from OpenWeatherMapApiKey import OpenWeatherMapApiKey
-import hashlib, json, os, requests, sys, time, urllib.request
+import hashlib, json, os, requests, sys, time
 
 # {{{ _capitalise(oldString)
 def _capitalise(oldString):
@@ -29,9 +29,9 @@ def _capitalise(oldString):
 def _flattenDict(oldDict, parentKey, sepChar):
     flatDict = {}
     for oldKey, oldVal in oldDict.items():
-        if type(oldVal) == dict:
+        if type(oldVal) is dict:
             flatDict = {**flatDict, **_flattenDict(oldVal, oldKey, sepChar)}
-        elif type(oldVal) == list:
+        elif type(oldVal) is list:
             for oldValIdx in range(len(oldVal)):
                 flatDict = {**flatDict, **_flattenDict(oldVal[oldValIdx], oldKey + "." + str(oldValIdx), sepChar)}
         else:
@@ -327,7 +327,7 @@ class OpenWeatherMap(object):
             if self.options["forecastDays"] > 1:
                 for n in range(0, len(data_["list"])):
                     dt = datetime.fromtimestamp(data_["list"][n]["dt"])
-                    if (dayLast != None) and (dayLast == dt.day):
+                    if (dayLast is not None) and (dayLast == dt.day):
                         continue
                     else:
                         dayLast = dt.day
@@ -459,9 +459,9 @@ class OpenWeatherMap(object):
         optionsList, args = getopt(argv[1:], self.optionsString)
         for optionChar, optionArg in optionsList:
             optionName = self.optionsStringMap[optionChar[1:]]
-            if type(self.optionsDefault[optionName]) == bool:
+            if type(self.optionsDefault[optionName]) is bool:
                 options[optionName] = True
-            elif type(self.optionsDefault[optionName]) == int:
+            elif type(self.optionsDefault[optionName]) is int:
                 options[optionName] = int(optionArg)
             else:
                 options[optionName] = optionArg
@@ -476,11 +476,11 @@ class OpenWeatherMap(object):
                     print("")
                 self._usageListAttributesAnsiTmux(options)
             exit(0)
-        elif options["city"] == None    \
-        or   options["country"] == None:
-            if options["city"] == None:
+        elif options["city"] is None    \
+        or   options["country"] is None:
+            if options["city"] is None:
                 print("error: missing city", file=sys.stderr)
-            if options["country"] == None:
+            if options["country"] is None:
                 print("error: missing country", file=sys.stderr)
             self._usage(argv[0], options); exit(0);
         else:
