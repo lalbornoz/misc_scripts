@@ -46,7 +46,7 @@ imgupload() {
 			-s				\
 			-F file="@${_fname}"		\
 			${_curl_args_extra}		\
-			"https://hardfiles.org")"	\
+			"https://upload.beer")"		\
 				|| _rc_last=1;
 
 		if [ "${_rc_last}" -eq 0 ]; then
@@ -84,3 +84,5 @@ imgupload() {
 };
 
 set -o errexit -o noglob -o nounset; imgupload "${@}";
+
+# vim:noexpandtab ts=8 sw=2
