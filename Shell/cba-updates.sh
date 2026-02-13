@@ -64,7 +64,19 @@ REMOTE_SCRIPT='
 		if [ -n "${dpkg_new_fnames}" ]; then
 			status "${?}" dpkg-new "${dpkg_new_fnames}";
 		fi;
-	fi';
+	fi;
+
+	# lsof -nd DEL | grep ...
+	lsof_del_libs="$(						\
+		lsof +c0 -n -d DEL					|\
+		grep -E '\''\s[^[:space:]]+lib[^[:space:]]+\.so'\''	|\
+		awk '\''{print $1}'\''					|\
+		sort | uniq						|\
+		tr "\n" " " | sed '\''s/  \+/ /g'\'' 2>&1)";
+	if [ -n "${lsof_del_libs}" ]; then
+		status "${?}" lsof-del-libs "${lsof_del_libs}";
+	fi;
+	';
 # }}}
 # {{{ Private subroutines
 logf() {
@@ -123,6 +135,8 @@ update_host() {
 						printf_rc "${DEFAULT_COLOUR_DIST_UPGRADE}" "${_rc}" " %s(%s)" "${_type}" "${_msg}"; ;;
 				dpkg-new)
 						printf_rc "" "${_rc}" " %s(%s)" "${_type}" "${_msg}"; ;;
+				lsof-del-libs)
+						printf_rc "" "${_rc}" " %s(%s)" "${_type}" "${_msg}"; ;;
 				rdepends)
 						printf_rc "${DEFAULT_COLOUR_RDEPENDS}" "${_rc}" " %s(%s)" "${_type}" "${_msg}"; ;;
 				services)
@@ -180,4 +194,4 @@ main() {
 
 set -o errexit -o noglob -o nounset; main "${@}";
 
-# vim:tw=0
+# vim:noexpandtab sw=8 ts=8
