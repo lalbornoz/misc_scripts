@@ -250,23 +250,25 @@ A copy of the deny list file is saved with the file extension ".bak" on each run
             if not status:
                 return rc
 
-        shutil.copy2(self.listFname, self.listFname + ".bak")
+        if os.path.exists(self.listFname):
+            shutil.copy2(self.listFname, self.listFname + ".bak")
         emailBuffer = sys.stdin.read()
         status, emailAddress = self.getEmailAddress(emailBuffer)
         if status and ("d" in self.options):
             status, emailAddress = self.getEmailDomainTld(emailAddress)
         if status:
             try:
-                listFile = open(self.listFname, "r+")
+                listFile = open(self.listFname, "a+")
             except Exception as e:
                 self.printWarnErr("error: {} when opening deny senders file {}, ignoring.".format(e, self.listFname))
                 rc = 1
-            with listFile:
-                if "a" in self.options:
-                    lineNew = emailAddress
-                elif "d" in self.options:
-                    lineNew = '^(.*\\.)?{}$'.format(re.escape(emailAddress))
-                self.writeLine(listFile, lineNew)
+            if rc == 0:
+                with listFile:
+                    if "a" in self.options:
+                        lineNew = emailAddress
+                    elif "d" in self.options:
+                        lineNew = '^(.*\\.)?{}$'.format(re.escape(emailAddress))
+                    self.writeLine(listFile, lineNew)
 
         if self.logFile is not None:
             self.logFile.close()
