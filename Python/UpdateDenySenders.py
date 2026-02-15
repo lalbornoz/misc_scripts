@@ -99,7 +99,7 @@ class DenySendersList(object):
                 self.printWarnErr("warning: invalid Sender header email address {} in email on stdin, ignoring.".format(address))
                 return False, None
             else:
-                return True, address
+                return True, address.rstrip()
     # ]]]
     # [[[ def getEmailDomainTld(self, address)
     def getEmailDomainTld(self, address):
