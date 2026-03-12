@@ -129,7 +129,7 @@ class DenySendersList(object):
             if "v" in self.options:
                 print("Adding {} to {}".format(lineNew, self.listFname), file=sys.stderr)
 
-            lines += [lineNew]; lines.sort()
+            lines += [lineNew]
             file.seek(0)
             file.write("\n".join(lines) + "\n")
             file.truncate()
