@@ -1,0 +1,12 @@
+[Unit]
+Description=Post-boot report
+After=multi-user.target
+Requires=multi-user.target
+
+[Service]
+Type=simple
+ExecStart=/lib/systemd/system/post_boot_report.sh
+KillMode=process
+
+[Install]
+WantedBy=multi-user.target
