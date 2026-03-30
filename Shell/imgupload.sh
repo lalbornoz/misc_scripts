@@ -1,5 +1,7 @@
 #!/bin/sh
 
+IMGPLOAD_URL="https://hardfiles.supernets.org";
+
 usage() {
 	printf "usage: %s [-v] [-w] [-X] fname[..]\n" "${1##*/}" 2>&1;
 	printf "       -v.........: pass -v to curl\n" 2>&1;
@@ -46,7 +48,7 @@ imgupload() {
 			-s				\
 			-F file="@${_fname}"		\
 			${_curl_args_extra}		\
-			"https://upload.beer")"		\
+			"${IMGPLOAD_URL}")"		\
 				|| _rc_last=1;
 
 		if [ "${_rc_last}" -eq 0 ]; then
