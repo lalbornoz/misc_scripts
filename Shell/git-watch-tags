@@ -20,8 +20,8 @@ main() {
 		if cd "${_git_repo}"; then
 			git pull >"${_git_log_fname}" 2>&1; _rc="${?}";
 			if [ "${_rc}" -eq 0 ]; then
-				_git_tags_new="$(sed -n				\
-					'/\[new tag\]/s/^.*-> \(.\+\)$/\1/p'	\
+				_git_tags_new="$(sed -n					\
+					'/\[new tag\]/s/^.*-> \(.\+\)$/\1/p'		\
 					"${_git_log_fname}")";
 			else
 				_git_tags_new="";
@@ -29,7 +29,8 @@ main() {
 			cd "${OLDPWD}";
 
 			if [ "${_git_tags_new:+1}" = 1 ]; then
-				printf "Git repository at %s has new tags:\n" "${_git_repo}";
+				printf "Git repository at %s (%s) has new tags:\n"	\
+					"${_git_repo}" "$(git remote get-url origin)";
 				printf "%s\n" "${_git_tags_new}";
 				printf "\n";
 			fi;
