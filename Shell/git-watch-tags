@@ -3,7 +3,7 @@
 GIT_WATCH_TAGS="";
 
 main() {
-	local _git_repo="" _git_log_fname="" _rc=0;
+	local _git_remote_url="" _git_repo="" _git_log_fname="" _rc=0;
 
 	if [ -r "${0}.conf" ]; then
 		. "${0}.conf";
@@ -23,6 +23,7 @@ main() {
 				_git_tags_new="$(sed -n					\
 					'/\[new tag\]/s/^.*-> \(.\+\)$/\1/p'		\
 					"${_git_log_fname}")";
+				_git_remote_url="$(git remote get-url origin)";
 			else
 				_git_tags_new="";
 			fi;
@@ -30,7 +31,7 @@ main() {
 
 			if [ "${_git_tags_new:+1}" = 1 ]; then
 				printf "Git repository at %s (%s) has new tags:\n"	\
-					"${_git_repo}" "$(git remote get-url origin)";
+					"${_git_repo}" "${_git_remote_url}";
 				printf "%s\n" "${_git_tags_new}";
 				printf "\n";
 			fi;
