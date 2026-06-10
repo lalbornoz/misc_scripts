@@ -76,6 +76,22 @@ REMOTE_SCRIPT='
 	if [ -n "${lsof_del_libs}" ]; then
 		status "${?}" lsof-del-libs "${lsof_del_libs}";
 	fi;
+
+	unlinked_services="$(						\
+		for PNAME in						\
+			/conf.local/lib/systemd/system/*.service	\
+			/conf.shared*/lib/systemd/system/*.service;
+		do
+			PNAME_BASE="${PNAME##*/}";
+			if ! [ -e "/lib/systemd/system/${PNAME_BASE}" ]	\
+			|| [ "$(readlink "/lib/systemd/system/${PNAME_BASE}")" != "${PNAME}" ]; then
+				SERVICE_UNITS="${SERVICE_UNITS:+${SERVICE_UNITS} }${PNAME_BASE}";
+			fi;
+		done;
+		printf "%s" "${SERVICE_UNITS}")";
+	if [ -n "${unlinked_services}" ]; then
+		status "${?}" unlinked-services "${unlinked_services}";
+	fi;
 	';
 # }}}
 # {{{ Private subroutines
@@ -141,6 +157,8 @@ update_host() {
 						printf_rc "${DEFAULT_COLOUR_RDEPENDS}" "${_rc}" " %s(%s)" "${_type}" "${_msg}"; ;;
 				services)
 						printf_rc "${DEFAULT_COLOUR_SERVICES}" "${_rc}" " %s(%s)" "${_type}" "${_msg}"; ;;
+				unlinked-services)
+						printf_rc "" "${_rc}" " %s(%s)" "${_type}" "${_msg}"; ;;
 				update)
 						printf_rc "" "${_rc}" " %s" "${_type}"; ;;
 				fini)		printf_rc "" "${_rc}" " %s" "[fetching log]";
