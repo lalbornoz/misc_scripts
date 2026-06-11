@@ -46,7 +46,9 @@ REMOTE_SCRIPT='
 		pkgs_rdepends="$(printf "%s\n" "${pkgs_rdepends}"					|
 			sed -n -e "s/^\s\+|\?//" -e "/^Reverse Depends:\$/d" -e "/^lib/d" -e "p"	|
 			sort | uniq | paste -sd " ")";
-		status "${rc}" rdepends "${pkgs_rdepends}";
+		if [ -n "${pkgs_rdepends}" ]; then
+			status "${rc}" rdepends "${pkgs_rdepends}";
+		fi;
 
 		# dpkg -l [ ... ] | grep -Eq "^(/etc/init.d|/lib/systemd/system)/"
 		for pkg in ${pkgs_rdepends}; do
