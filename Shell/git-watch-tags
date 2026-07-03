@@ -3,7 +3,8 @@
 GIT_WATCH_TAGS="";
 
 main() {
-	local _git_remote_url="" _git_repo="" _git_log_fname="" _rc=0;
+	local	_git_log_fname="" _git_remote_url="" _git_repo="" _git_repo_mask=""	\
+		_git_tags_new="" _rc=0;
 
 	if [ -r "${0}.conf" ]; then
 		. "${0}.conf";
@@ -17,12 +18,23 @@ main() {
 	fi;
 
 	for _git_repo in "${@}"; do
+		if [ "${_git_repo#*!}" != "${_git_repo}" ]; then
+			_git_repo_mask="${_git_repo#*!}";
+			_git_repo="${_git_repo%!*}";
+		else
+			_git_repo_mask="";
+		fi;
+
 		if cd "${_git_repo}"; then
 			git pull >"${_git_log_fname}" 2>&1; _rc="${?}";
 			if [ "${_rc}" -eq 0 ]; then
 				_git_tags_new="$(sed -n					\
 					'/\[new tag\]/s/^.*-> \(.\+\)$/\1/p'		\
 					"${_git_log_fname}")";
+				if [ "${_git_repo_mask:+1}" = 1 ]; then
+					_git_tags_new="$(printf "%s" "${_git_tags_new}"	|\
+						sed -ne "/${_git_repo_mask}/!p")";
+				fi;
 				_git_remote_url="$(git remote get-url origin)";
 			else
 				_git_tags_new="";
@@ -39,4 +51,4 @@ main() {
 	done;
 };
 
-set +o errexit -o noglob -o nounset +o xtrace; main "${@}";
+set +o errexit -o noglob -o nounset; main "${@}";
