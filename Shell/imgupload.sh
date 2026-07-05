@@ -1,6 +1,6 @@
 #!/bin/sh
 
-IMGPLOAD_URL="https://hardfiles.supernets.org";
+IMGPLOAD_URL="https://x0.at";
 
 usage() {
 	printf "usage: %s [-v] [-w] [-X] fname[..]\n" "${1##*/}" 2>&1;
