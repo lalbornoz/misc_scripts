@@ -94,6 +94,22 @@ REMOTE_SCRIPT='
 	if [ -n "${unlinked_services}" ]; then
 		status "${?}" unlinked-services "${unlinked_services}";
 	fi;
+
+	unlinked_localtime_timezone="$(					\
+		for PNAME in						\
+			/etc/localtime					\
+			/etc/timezone;
+		do
+			PNAME_BASE="${PNAME##*/}";
+			if [ "$(readlink "${PNAME}")" != "/conf.local/etc/${PNAME_BASE}" ]; then
+				LOCALTIME_TIMEZONE_FILES="${LOCALTIME_TIMEZONE_FILES:+${LOCALTIME_TIMEZONE_FILES} }${PNAME}";
+			fi;
+		done;
+		printf "%s" "${LOCALTIME_TIMEZONE_FILES}")";
+	if [ -n "${unlinked_localtime_timezone}" ]; then
+		status "${?}" unlinked-localtime-timezone "${unlinked_localtime_timezone}";
+	fi;
+
 	';
 # }}}
 # {{{ Private subroutines
@@ -160,6 +176,8 @@ update_host() {
 				services)
 						printf_rc "${DEFAULT_COLOUR_SERVICES}" "${_rc}" " %s(%s)" "${_type}" "${_msg}"; ;;
 				unlinked-services)
+						printf_rc "" "${_rc}" " %s(%s)" "${_type}" "${_msg}"; ;;
+				unlinked-localtime-timezone)
 						printf_rc "" "${_rc}" " %s(%s)" "${_type}" "${_msg}"; ;;
 				update)
 						printf_rc "" "${_rc}" " %s" "${_type}"; ;;
