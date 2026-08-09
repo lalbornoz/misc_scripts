@@ -1,6 +1,6 @@
 #!/bin/sh
 
-IMGPLOAD_URL="https://x0.at";
+IMGPLOAD_URL="https://uguu.se/upload";
 
 usage() {
 	printf "usage: %s [-v] [-w] [-X] fname[..]\n" "${1##*/}" 2>&1;
@@ -44,11 +44,12 @@ imgupload() {
 		fi;
 
 		_rc_last=0;
-		_url="$(curl				\
-			-s				\
-			-F file="@${_fname}"		\
-			${_curl_args_extra}		\
-			"${IMGPLOAD_URL}")"		\
+		_url="$(curl									\
+			-s									\
+			-F files[]="@${_fname}"							\
+			${_curl_args_extra}							\
+			"${IMGPLOAD_URL}"							|\
+			sed -ne '/"url":/{s/^.*"url":[^"]\+"\(.\+\)",.*$/\1/; s/\\//g; p}')"	\
 				|| _rc_last=1;
 
 		if [ "${_rc_last}" -eq 0 ]; then
