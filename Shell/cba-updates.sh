@@ -110,6 +110,15 @@ REMOTE_SCRIPT='
 		status "${?}" unlinked-localtime-timezone "${unlinked_localtime_timezone}";
 	fi;
 
+	unlinked_aliases="$(						\
+		if [ "$(readlink "/etc/aliases")" != "/etc/exim4/aliases" ]; then
+			ALIASES_FILES="/etc/aliases";
+		fi;
+		printf "%s" "${ALIASES_FILES}")";
+	if [ -n "${unlinked_aliases}" ]; then
+		status "${?}" unlinked-aliases "${unlinked_aliases}";
+	fi;
+
 	';
 # }}}
 # {{{ Private subroutines
@@ -178,6 +187,8 @@ update_host() {
 				unlinked-services)
 						printf_rc "" "${_rc}" " %s(%s)" "${_type}" "${_msg}"; ;;
 				unlinked-localtime-timezone)
+						printf_rc "" "${_rc}" " %s(%s)" "${_type}" "${_msg}"; ;;
+				unlinked-aliases)
 						printf_rc "" "${_rc}" " %s(%s)" "${_type}" "${_msg}"; ;;
 				update)
 						printf_rc "" "${_rc}" " %s" "${_type}"; ;;
